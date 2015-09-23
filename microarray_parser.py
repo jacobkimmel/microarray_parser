@@ -21,7 +21,7 @@ USAGE:
 
 import csv
 import sys
-import statistics as stat
+import numpy as np
 import operator
 
 def CommonDirection(x, y, z):
@@ -33,7 +33,7 @@ def CommonDirection(x, y, z):
 		else:
 			positives.append(var)
 	if len(negatives) > 1:
-		avg = stat.mean(negatives)
+		avg = np.mean(negatives)
 		included_vars = negatives
 	else:
 		avg = np.mean(positives)
@@ -42,7 +42,8 @@ def CommonDirection(x, y, z):
 	return avg, ' '.join(included_vars)
 
 def calculate_variability(x, y, z):
-	SD = stat.stdev(x, y, z)
+	a = np.array( [ x, y, z] )
+	SD = np.std(a)
 	return SD
 
 raw_file = open(sys.argv[2], 'rb')
@@ -80,17 +81,32 @@ while i < len(SYMBOL):
 
 genes_with_lowvar = []
 i = 0
+
+percentile80th_SD = np.percentile( np.array(standard_deviations), 95)
+print percentile80th_SD
+
 while i < len(SYMBOL):
-	if standard_deviations[i] < 2: 
+	if standard_deviations[i] < percentile80th_SD: 
 		line = (SYMBOL[i], GO[i], Exp1[i], Exp2[i], Exp3[i], avg_expression[i], mice_used[i], standard_deviations[i])
+		genes_with_lowvar.append(line)
+	else:
+		None
+		#print "Skipped line ", i, "with SD = ", standard_deviations[i]
+	i += 1
 
 #Sort list based on average relative expression from selected samples
 #Sorts with negative numbers (highest exp) at the top
 genes_with_averages = sorted(genes_with_averages, key = operator.itemgetter(5))
+genes_with_lowvar = sorted(genes_with_lowvar, key = operator.itemgetter(5))
 
-for line in genes_with_averages:
+#for line in genes_with_averages:
+#	print line
+
+#for line in standard_deviations:
+#	print line
+
+for line in genes_with_lowvar:
 	print line
-
 
 # Use CSV library to write to CSV
 # write_all_genes() writes every calculated gene with average expression to a csv
@@ -101,21 +117,20 @@ def write_all_genes():
 	with out_file as f:
 		selectric = csv.writer(out_file, dialect='excel', quoting=csv.QUOTE_NONE)
 		selectric.writerow( ["SYMBOL", "GO", "Exp1", "Exp2", "Exp3", "SelectiveAVG", "SelectedMice", "SD"] )
-		i = 0
 		for row in genes_with_averages:
 			selectric.writerow(row)
 
-def write_low_variability():
+def write_low_variability_genes():
 	out_file = open( sys.argv[3], 'wb' )
 	with out_file as f:
 		selectric = csv.writer(out_file, dialect='excel', quoting=csv.QUOTE_NONE)
 		selectric.writerow( ["SYMBOL", "GO", "Exp1", "Exp2", "Exp3", "SelectiveAVG", "SelectedMice", "SD"] )
-		i = 0
 		for row in genes_with_lowvar:
 			selectric.writerow(row)
 
 
 variability = sys.argv[1]
+unacceptable_flag_error = "Unacceptable flags entered. \n Please enter -a for all genes, -l for low variability"
 
 if variability == "-a":
 	write_all_genes()
@@ -125,4 +140,3 @@ else:
 	print unacceptable_flag_error
 
 
-unacceptable_variable_error = "Unacceptable flags entered. \n Please enter -a for all genes, -l for low variability"
